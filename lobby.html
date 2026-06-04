@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JS Arena — Lobby</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: #16213e;
+      border: 2px solid #e94560;
+      border-radius: 12px;
+      padding: 40px;
+      width: 420px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2.4em;
+      color: #e94560;
+      margin-bottom: 6px;
+      letter-spacing: 4px;
+    }
+
+    .subtitle {
+      color: #aaa;
+      font-size: 0.9em;
+      margin-bottom: 30px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      margin: 8px 0;
+      background: #0f3460;
+      border: 1px solid #e94560;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1em;
+      outline: none;
+    }
+
+    input::placeholder { color: #888; }
+    input:focus { border-color: #fff; }
+
+    .btn {
+      width: 100%;
+      padding: 13px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn-red   { background: #e94560; color: #fff; }
+    .btn-grey  { background: #333; color: #fff; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 16px 0;
+      color: #555;
+      font-size: 0.85em;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #333;
+      margin: 0 10px;
+    }
+
+    #joinSection { display: none; }
+
+    .error {
+      color: #ff6b6b;
+      font-size: 0.85em;
+      margin-top: 8px;
+      min-height: 20px;
+    }
+
+    /* Lobby waiting room */
+    #lobbyRoom { display: none; }
+
+    .room-code {
+      font-size: 2.8em;
+      font-weight: bold;
+      letter-spacing: 8px;
+      color: #ffd700;
+      margin: 16px 0;
+    }
+
+    .player-list {
+      background: #0f3460;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 16px 0;
+      min-height: 80px;
+      text-align: left;
+    }
+
+    .player-list .player-entry {
+      padding: 6px 8px;
+      border-bottom: 1px solid #1a4a80;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .player-list .player-entry:last-child { border-bottom: none; }
+
+    .host-tag {
+      font-size: 0.7em;
+      background: #e94560;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    #startBtn { display: none; }
+
+    .waiting-text {
+      color: #aaa;
+      font-size: 0.85em;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Name + mode selection -->
+    <div id="mainSection">
+      <h1>JS ARENA</h1>
+      <p class="subtitle">Battle Royale</p>
+
+      <input type="text" id="nameInput" placeholder="Enter your username" maxlength="20" />
+      <div class="error" id="mainError"></div>
+
+      <button class="btn btn-red" onclick="createRoom()">Create Room</button>
+
+      <div class="divider">or</div>
+
+      <button class="btn btn-grey" onclick="showJoin()">Join Room</button>
+
+      <div id="joinSection">
+        <input type="text" id="codeInput" placeholder="Enter room code" maxlength="4"
+               style="text-transform:uppercase; letter-spacing:4px; text-align:center;" />
+        <button class="btn btn-red" onclick="joinRoom()">Join</button>
+      </div>
+    </div>
+
+    <!-- Waiting lobby -->
+    <div id="lobbyRoom">
+      <h1>JS ARENA</h1>
+      <p class="subtitle">Waiting for players...</p>
+      <p style="color:#aaa; font-size:0.85em;">Share this code with friends:</p>
+      <div class="room-code" id="roomCodeDisplay">----</div>
+      <div class="player-list" id="playerList"></div>
+      <div class="waiting-text" id="waitingText">Waiting for host to start...</div>
+      <button class="btn btn-red" id="startBtn" onclick="startGame()">Start Game</button>
+      <div class="error" id="lobbyError"></div>
+    </div>
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let myId     = null;
+    let isHost   = false;
+    let roomCode = null;
+
+    socket.on('connect', () => { myId = socket.id; });
+
+    function showJoin() {
+      document.getElementById('joinSection').style.display = 'block';
+    }
+
+    function getName() {
+      const name = document.getElementById('nameInput').value.trim();
+      if (!name) {
+        document.getElementById('mainError').textContent = 'Please enter a username.';
+        return null;
+      }
+      document.getElementById('mainError').textContent = '';
+      return name;
+    }
+
+    function createRoom() {
+      const name = getName();
+      if (!name) return;
+      socket.emit('create_room', { name }, (res) => {
+        if (res.error) { document.getElementById('mainError').textContent = res.error; return; }
+        roomCode = res.code;
+        isHost   = true;
+        showLobby(res.players);
+        document.getElementById('startBtn').style.display = 'block';
+        document.getElementById('waitingText').textContent = 'You are the host. Start when ready!';
+      });
+    }
+
+    function joinRoom() {
+      const name = getName();
+      if (!name) return;
+      const code = document.getElementById('codeInput').value.trim().toUpperCase();
+      if (!code) { document.getElementById('mainError').textContent = 'Enter a room code.'; return; }
+      socket.emit('join_room', { name, code }, (res) => {
+        if (res.error) { document.getElementById('mainError').textContent = res.error; return; }
+        roomCode = res.code;
+        isHost   = socket.id === res.host;
+        showLobby(res.players);
+        if (isHost) {
+          document.getElementById('startBtn').style.display = 'block';
+          document.getElementById('waitingText').textContent = 'You are the host. Start when ready!';
+        }
+      });
+    }
+
+    function showLobby(players) {
+      document.getElementById('mainSection').style.display  = 'none';
+      document.getElementById('lobbyRoom').style.display    = 'block';
+      document.getElementById('roomCodeDisplay').textContent = roomCode;
+      renderPlayers(players);
+    }
+
+    function renderPlayers(players) {
+      const list = document.getElementById('playerList');
+      list.innerHTML = '';
+      Object.values(players).forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'player-entry';
+        div.innerHTML = `<span>👤 ${p.name}</span>${p.id === socket.id ? ' <span class="host-tag">YOU</span>' : ''}`;
+        list.appendChild(div);
+      });
+    }
+
+    function startGame() {
+      socket.emit('start_game');
+    }
+
+    socket.on('player_joined', ({ players }) => { renderPlayers(players); });
+    socket.on('player_left',   ({ id })      => {
+      // Re-render handled by next player_joined or just remove visually
+    });
+
+    socket.on('host_changed', ({ newHost }) => {
+      if (newHost === socket.id) {
+        isHost = true;
+        document.getElementById('startBtn').style.display   = 'block';
+        document.getElementById('waitingText').textContent  = 'Host left. You are now the host!';
+      }
+    });
+
+    socket.on('game_started', ({ players }) => {
+      // Store session info and redirect to game
+      sessionStorage.setItem('playerName', document.getElementById('nameInput').value.trim());
+      sessionStorage.setItem('roomCode',   roomCode);
+      sessionStorage.setItem('isHost',     isHost ? '1' : '0');
+      sessionStorage.setItem('players',    JSON.stringify(players));
+      window.location.href = '/index.html';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JS Arena</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1208;
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+    }
+
+    /* ---- LOBBY ---- */
+    #lobbyScreen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+      background: radial-gradient(ellipse at center, #2a1f0a 0%, #0d0a04 100%);
+    }
+
+    .container {
+      background: rgba(20, 14, 4, 0.92);
+      border: 2px solid #8b6914;
+      border-radius: 4px;
+      padding: 40px;
+      width: 440px;
+      text-align: center;
+      color: #d4aa60;
+      box-shadow: 0 0 40px rgba(180, 120, 20, 0.3), inset 0 0 40px rgba(0,0,0,0.5);
+    }
+
+    h1 {
+      font-size: 2.6em;
+      color: #e8b84b;
+      margin-bottom: 4px;
+      letter-spacing: 8px;
+      text-shadow: 0 0 20px rgba(232,184,75,0.6);
+    }
+    .subtitle { color: #7a6030; font-size: 0.85em; margin-bottom: 28px; letter-spacing: 3px; }
+
+    input {
+      width: 100%; padding: 11px 14px; margin: 7px 0;
+      background: #0d0a04;
+      border: 1px solid #5a4010;
+      border-radius: 3px;
+      color: #e8b84b;
+      font-size: 1em;
+      font-family: 'Courier New', monospace;
+      outline: none;
+    }
+    input::placeholder { color: #4a3820; }
+    input:focus { border-color: #e8b84b; box-shadow: 0 0 8px rgba(232,184,75,0.3); }
+
+    .btn {
+      width: 100%; padding: 12px; margin: 7px 0;
+      border: none; border-radius: 3px;
+      font-size: 1em; font-weight: bold;
+      font-family: 'Courier New', monospace;
+      cursor: pointer; transition: all 0.2s;
+      letter-spacing: 2px;
+    }
+    .btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+    .btn-primary {
+      background: #8b4a00;
+      color: #ffe0a0;
+      border: 1px solid #c06a00;
+      box-shadow: 0 3px 12px rgba(180,80,0,0.4);
+    }
+    .btn-secondary {
+      background: #1a1208;
+      color: #8b6914;
+      border: 1px solid #4a3410;
+    }
+
+    .divider {
+      display: flex; align-items: center;
+      margin: 14px 0; color: #3a2810; font-size: 0.8em; letter-spacing: 2px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: #3a2810; margin: 0 10px;
+    }
+
+    .error { color: #cc4400; font-size: 0.85em; margin-top: 6px; min-height: 18px; }
+
+    #waitingRoom { display: none; }
+
+    .room-code {
+      font-size: 3em; font-weight: bold;
+      letter-spacing: 10px; color: #e8b84b;
+      margin: 14px 0;
+      text-shadow: 0 0 16px rgba(232,184,75,0.7);
+    }
+
+    .player-list {
+      background: #0a0804;
+      border: 1px solid #3a2810;
+      border-radius: 3px;
+      padding: 10px; margin: 14px 0; min-height: 60px; text-align: left;
+    }
+
+    .player-entry {
+      padding: 6px 8px; border-bottom: 1px solid #2a1e08;
+      display: flex; align-items: center; gap: 8px; color: #c49a30;
+      font-size: 0.9em;
+    }
+    .player-entry:last-child { border-bottom: none; }
+    .you-tag {
+      font-size: 0.7em; background: #6b3800;
+      color: #ffc060; padding: 2px 6px; border-radius: 2px;
+      border: 1px solid #8b5000;
+    }
+
+    #startBtn { display: none; }
+    .waiting-text { color: #5a4020; font-size: 0.82em; margin-top: 8px; letter-spacing: 1px; }
+
+    /* ---- GAME ---- */
+    #gameScreen {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #c8c8c8;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOBBY -->
+  <div id="lobbyScreen">
+    <div class="container">
+
+      <!-- Name + mode -->
+      <div id="mainSection">
+        <h1>JS ARENA</h1>
+        <p class="subtitle">⚔ BATTLE ROYALE ⚔</p>
+        <input type="text" id="nameInput" placeholder="Enter your username" maxlength="20" />
+        <div class="error" id="mainError"></div>
+        <button class="btn btn-primary" onclick="createRoom()">⚔ CREATE ROOM</button>
+        <div class="divider">— or join existing —</div>
+        <input type="text" id="codeInput" placeholder="Room code (e.g. AAA)"
+               maxlength="3" style="text-transform:uppercase;letter-spacing:6px;text-align:center;font-size:1.2em;" />
+        <button class="btn btn-secondary" onclick="joinRoom()">▶ JOIN ROOM</button>
+      </div>
+
+      <!-- Waiting room -->
+      <div id="waitingRoom">
+        <h1>JS ARENA</h1>
+        <p class="subtitle">⚔ WAITING FOR SOLDIERS ⚔</p>
+        <p style="color:#5a4020;font-size:0.82em;letter-spacing:2px;">SHARE THIS CODE:</p>
+        <div class="room-code" id="roomCodeDisplay">---</div>
+        <div class="player-list" id="playerList"></div>
+        <div class="waiting-text" id="waitingText">Waiting for host to start...</div>
+        <button class="btn btn-primary" id="startBtn" onclick="startGame()">⚔ START BATTLE</button>
+        <div class="error" id="lobbyError"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="gameScreen">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="map.js"></script>
+  <script src="player.js"></script>
+  <script src="combat.js"></script>
+  <script src="sounds.js"></script>
+
+  <script>
+    // ---- LOBBY LOGIC ----
+    const socket  = io();
+    let myRoomCode = '';
+    let amHost     = false;
+
+    socket.on('connect', () => {});
+
+    function getName() {
+      const n = document.getElementById('nameInput').value.trim();
+      if (!n) { document.getElementById('mainError').textContent = 'Enter a username.'; return null; }
+      document.getElementById('mainError').textContent = '';
+      return n;
+    }
+
+    function createRoom() {
+      const name = getName(); if (!name) return;
+      socket.emit('create_room', { name }, (res) => {
+        if (res.error) { document.getElementById('mainError').textContent = res.error; return; }
+        myRoomCode = res.code;
+        amHost     = true;
+        showWaiting(res.players);
+        document.getElementById('startBtn').style.display    = 'block';
+        document.getElementById('waitingText').textContent   = 'You are the host. Start when ready!';
+      });
+    }
+
+    function joinRoom() {
+      const name = getName(); if (!name) return;
+      const code = document.getElementById('codeInput').value.trim().toUpperCase();
+      if (!code) { document.getElementById('mainError').textContent = 'Enter a room code.'; return; }
+      socket.emit('join_room', { name, code }, (res) => {
+        if (res.error) { document.getElementById('mainError').textContent = res.error; return; }
+        myRoomCode = res.code;
+        amHost     = socket.id === res.host;
+        showWaiting(res.players);
+        if (amHost) {
+          document.getElementById('startBtn').style.display  = 'block';
+          document.getElementById('waitingText').textContent = 'You are the host. Start when ready!';
+        }
+      });
+    }
+
+    function showWaiting(players) {
+      document.getElementById('mainSection').style.display  = 'none';
+      document.getElementById('waitingRoom').style.display  = 'block';
+      document.getElementById('roomCodeDisplay').textContent = myRoomCode;
+      renderPlayers(players);
+    }
+
+    function renderPlayers(players) {
+      const list = document.getElementById('playerList');
+      list.innerHTML = '';
+      Object.values(players).forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'player-entry';
+        div.innerHTML = `👤 ${p.name} ${p.id === socket.id ? '<span class="you-tag">YOU</span>' : ''}`;
+        list.appendChild(div);
+      });
+    }
+
+    function startGame() { socket.emit('start_game'); }
+
+    socket.on('player_joined', ({ players }) => { renderPlayers(players); });
+
+    socket.on('host_changed', ({ newHost }) => {
+      if (newHost === socket.id) {
+        amHost = true;
+        document.getElementById('startBtn').style.display  = 'block';
+        document.getElementById('waitingText').textContent = 'Host left. You are now the host!';
+      }
+    });
+
+    socket.on('player_left', () => {});
+
+    // ---- LOADING PHASE — switch to game screen and start loading assets ----
+    socket.on('load_assets', ({ players }) => {
+      document.getElementById('lobbyScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display  = 'flex';
+      startLoad_init(players, socket.id);
+    });
+
+    // ---- ALL PLAYERS READY — start the actual game ----
+    socket.on('game_started', ({ players, startTime }) => {
+      startGame_init(players, startTime);
+    });
+
+    // ---- Show ready count in lobby while waiting ----
+    socket.on('player_ready_update', ({ readyCount, totalCount }) => {
+      document.getElementById('waitingText').textContent =
+        `Loading... ${readyCount}/${totalCount} players ready`;
+    });
+  </script>
+
+  <script src="game.js"></script>
+</body>
+</html>
