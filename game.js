@@ -1,5 +1,5 @@
-// game.js — called after lobby switches to game screen
-// startGame_init() is called from index.html when game_started fires
+// game.js — main game loop, camera, border, HUD, multiplayer sync
+// startLoad_init() begins asset loading; startGame_init() launches the game loop
 
 const CANVAS_W = 1280;
 const CANVAS_H = 720;
@@ -26,6 +26,20 @@ let gameStartTime = 0;
 function startLoad_init(players, mySocketId) {
   gameCanvas = document.getElementById('gameCanvas');
   ctx        = gameCanvas.getContext('2d');
+
+  // Fetch game config via AJAX and apply weapon stats from JSON
+  fetch('data.json')
+    .then(res => res.json())
+    .then(data => {
+      // Apply weapon damage/range from JSON into WEAPON_STATS
+      Object.keys(data.weapons).forEach(key => {
+        if (WEAPON_STATS[key]) {
+          WEAPON_STATS[key].damage = data.weapons[key].damage;
+          WEAPON_STATS[key].range  = data.weapons[key].range;
+        }
+      });
+    })
+    .catch(() => {});
 
   // Build player objects so sprites start loading
   Object.values(players).forEach(data => {
@@ -176,6 +190,7 @@ socket.on('bullet_fired', (data) => {
 });
 
 socket.on('player_damaged', ({ targetId, hp, killerId, killed, killerName, targetName, killerKills }) => {
+  try {
   const target = getAllPlayers().find(p => p.id === targetId);
   if (!target) return;
   const wasAlive = !target.dead;
@@ -202,11 +217,14 @@ socket.on('player_damaged', ({ targetId, hp, killerId, killed, killerName, targe
     target._setAnim('hit');
   }
   combat.hitEffects.push(new HitEffect(target.x + target.w / 2, target.y + target.h * 0.6));
+  } catch (err) {
+    console.error('player_damaged handler error:', err);
+  }
 });
 
 socket.on('game_over', ({ winner }) => { gameOver = true; winnerName = winner; });
 
-// ---- Camera ----
+// ---- Camera — clamps to map edges so player stays centered ----
 const camera = { x: 0, y: 0 };
 
 function updateCamera() {
@@ -432,6 +450,7 @@ function gameLoop(timestamp) {
   // Get roomCode from the lobby variable
   const rc = (typeof myRoomCode !== 'undefined') ? myRoomCode : '';
 
+  // Compute elapsed from server timestamp so all clients stay in sync
   border.elapsed = (Date.now() - gameStartTime) / 1000;
   const rect = getBorderRect(border.elapsed);
 

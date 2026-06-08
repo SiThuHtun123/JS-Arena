@@ -1,3 +1,4 @@
+// server.js — Node.js + Socket.io server for JS Arena multiplayer
 const express    = require('express');
 const http       = require('http');
 const { Server } = require('socket.io');
@@ -26,6 +27,7 @@ const PLAYER_COLORS = [
   '#ff1744','#2979ff','#00e676','#ffd740','#e040fb',
 ];
 
+// Generates 3-same-letter room codes (AAA, BBB, etc.)
 function generateCode() {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let letter;
@@ -135,14 +137,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('player_update', (data) => {
-    const code = socket.roomCode;
-    const room = rooms[code];
-    if (!room || !room.players[socket.id]) return;
-    const p = room.players[socket.id];
-    p.x = data.x; p.y = data.y; p.hp = data.hp; p.dead = data.dead;
-    p.weapon = data.weapon; p.facingLeft = data.facingLeft;
-    p.currentAnim = data.currentAnim; p.animFrame = data.animFrame;
-    socket.to(code).emit('player_update', { id: socket.id, ...data });
+    try {
+      const code = socket.roomCode;
+      const room = rooms[code];
+      if (!room || !room.players[socket.id]) return;
+      const p = room.players[socket.id];
+      p.x = data.x; p.y = data.y; p.hp = data.hp; p.dead = data.dead;
+      p.weapon = data.weapon; p.facingLeft = data.facingLeft;
+      p.currentAnim = data.currentAnim; p.animFrame = data.animFrame;
+      socket.to(code).emit('player_update', { id: socket.id, ...data });
+    } catch (err) {
+      console.error('player_update error:', err);
+    }
   });
 
   socket.on('bullet_fired', (data) => {
@@ -150,26 +156,31 @@ io.on('connection', (socket) => {
     if (code) socket.to(code).emit('bullet_fired', data);
   });
 
+  // Server is authoritative for damage so all clients see the same HP
   socket.on('player_damaged', ({ targetId, damage, killerId }) => {
-    const code = socket.roomCode;
-    const room = rooms[code];
-    if (!room) return;
-    const target = room.players[targetId];
-    if (!target || target.dead) return;
-    target.hp = Math.max(0, target.hp - damage);
-    const killed = target.hp <= 0 && !target.dead;
-    if (killed) target.dead = true;
-    let killerName = null;
-    if (killed && killerId && room.players[killerId]) {
-      room.players[killerId].kills++;
-      killerName = room.players[killerId].name;
+    try {
+      const code = socket.roomCode;
+      const room = rooms[code];
+      if (!room) return;
+      const target = room.players[targetId];
+      if (!target || target.dead) return;
+      target.hp = Math.max(0, target.hp - damage);
+      const killed = target.hp <= 0 && !target.dead;
+      if (killed) target.dead = true;
+      let killerName = null;
+      if (killed && killerId && room.players[killerId]) {
+        room.players[killerId].kills++;
+        killerName = room.players[killerId].name;
+      }
+      io.to(code).emit('player_damaged', {
+        targetId, damage, hp: target.hp, killerId,
+        killed, killerName, targetName: target.name,
+        killerKills: killerId && room.players[killerId] ? room.players[killerId].kills : 0,
+      });
+      checkWin(room, code);
+    } catch (err) {
+      console.error('player_damaged error:', err);
     }
-    io.to(code).emit('player_damaged', {
-      targetId, damage, hp: target.hp, killerId,
-      killed, killerName, targetName: target.name,
-      killerKills: killerId && room.players[killerId] ? room.players[killerId].kills : 0,
-    });
-    checkWin(room, code);
   });
 
   socket.on('disconnect', () => {

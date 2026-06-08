@@ -1,0 +1,23 @@
+{
+  "gameConfig": {
+    "borderDuration": 120,
+    "borderDamagePerSec": 5,
+    "healOnKill": 30,
+    "maxPlayers": 30,
+    "mapWidth": 3200,
+    "mapHeight": 2400
+  },
+  "weapons": {
+    "fighter": { "damage": 4, "range": 15, "label": "Fist" },
+    "sword":   { "damage": 12, "range": 25, "label": "Sword" },
+    "pistol":  { "damage": 8,  "range": 900, "label": "Pistol" }
+  },
+  "playerColors": [
+    "#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6",
+    "#1abc9c","#e67e22","#e91e63","#00bcd4","#8bc34a",
+    "#ff5722","#607d8b","#ff9800","#673ab7","#009688",
+    "#f44336","#2196f3","#4caf50","#ffeb3b","#ff4081",
+    "#00e5ff","#76ff03","#ff6d00","#d500f9","#00e676",
+    "#ff1744","#2979ff","#00e676","#ffd740","#e040fb"
+  ]
+}

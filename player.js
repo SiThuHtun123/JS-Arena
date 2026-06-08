@@ -1,3 +1,4 @@
+// player.js — Player class with animation state machine, movement, combat, and healing
 const PLAYER_SPEED   = 200;
 const DASH_SPEED     = 520;
 const DASH_DURATION  = 0.36;
@@ -25,7 +26,7 @@ const ANIM = {
   shot:          { prefix: 'shot',  start: 64, count: 2,  fps: 10, loop: false },
 };
 
-// Map weapon -> which attack anim key to use
+// Each weapon uses a different attack animation
 const WEAPON_ANIM = { fighter: 'combo_fighter', sword: 'combo_sword', pistol: 'shot' };
 
 // Sword has different combo start frame
@@ -155,6 +156,7 @@ class Player {
     }
   }
 
+  // Called when this player gets a kill — restores HP up to max
   heal(amount) {
     if (this.dead) return;
     this.hp        = Math.min(this.maxHp, this.hp + amount);
